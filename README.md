@@ -1,3 +1,4 @@
+```
 /pixelplayer
 |
 ├── app/
@@ -25,3 +26,4 @@
 ├── docker-compose.yml        # Файл для оркестрации контейнеров
 ├── Dockerfile                # Инструкции для сборки Docker-образа приложения
 └── requirements.txt          # Зависимости Python
+```
