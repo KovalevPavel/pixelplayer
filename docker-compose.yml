@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # FastAPI приложение
+  app:
+    build: .
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy # Ждем, пока БД будет готова
+      minio:
+        condition: service_started
+    volumes:
+      - ./app:/app/app # Для разработки: изменения в коде сразу видны в контейнере
+    networks:
+      - app-network
+
+  # База данных PostgreSQL
+  db:
+    image: postgres:14-alpine
+    env_file: .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - "5442:5432" # Открываем порт наружу для удобства отладки
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Хранилище MinIO
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    env_file: .env
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Веб-консоль
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  app-network:
+    driver: bridge
