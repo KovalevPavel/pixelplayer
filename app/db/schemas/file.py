@@ -18,4 +18,11 @@ class File(BaseModel):
     owner_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+# Схема директории для ответа API
+class Dir(BaseModel):
+    original_name: str
+
+    class Config:
+        from_attributes = True

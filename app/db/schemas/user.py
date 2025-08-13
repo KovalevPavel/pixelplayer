@@ -11,7 +11,7 @@ class UserBase(BaseModel):
     username: str
 
     class Config:
-        orm_mode = True # Позволяет Pydantic работать с объектами SQLAlchemy
+        from_attributes = True # Позволяет Pydantic работать с объектами SQLAlchemy
 
 # Полная схема пользователя (для ответа API)
 class User(UserBase):
