@@ -18,12 +18,10 @@
 │   │   └── user.py           # Схемы Pydantic для пользователей
 │   ├── services/
 │   │   └── minio_client.py   # Клиент для работы с MinIO
-│   ├── templates/
-│   │   └── index.html        # Простой HTML-интерфейс
 │   └── main.py               # Главный файл приложения
 |
-├── .env                      # Переменные окружения (СЕКРЕТЫ)
+├── .env                      # Переменные окружения
 ├── docker-compose.yml        # Файл для оркестрации контейнеров
 ├── Dockerfile                # Инструкции для сборки Docker-образа приложения
-└── requirements.txt          # Зависимости Python
+└── requirements              # Зависимости Python
 ```

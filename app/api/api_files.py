@@ -1,29 +1,28 @@
-import re
-from typing import List
+import logging
+from typing import List, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File as FastAPIFile, Request
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File as FastAPIFile, Header
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 
-from app.services.minio.archive_handler import ZipArchiveHandler, TarArchiveHandler, GzArchiveHandler, _save_file_stream_to_minio_and_db
-from .. import crud
-from ..db import  schemas
-from ..core.security import get_current_active_user
-from ..db.database import get_db
-# from app.services.minio_client import minio_client, config
+from app.services.minio.archive_handler import ZipArchiveHandler, TarArchiveHandler, GzArchiveHandler
+from ..db.db_dto import FileDbDto, UserDbDto
+from ..services.minio.archive_handler import save_file_stream_to_minio_and_db
 from ..services.minio.operations import get_object, remove_object
+
+from ..data.auth import auth_repository
+from ..data.file import file_dto, file_repository
+
 
 fileRouter = APIRouter(prefix="/files")
 
-@fileRouter.post("/upload", response_model=List[schemas.File])
+@fileRouter.post("/upload", response_model=List[file_dto.FileDto])
 async def upload_files(
-    files: List[UploadFile] = FastAPIFile(...),
-    current_user: schemas.User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    files_list: List[UploadFile] = FastAPIFile(...),
+    current_user: UserDbDto = Depends(auth_repository.get_current_active_user),
+    custom_dir: Union[str, None] = None,
 ):
     """
-    Загружает файлы и архивы (zip, tar, tar.gz, tgz, gz) в MinIO.
-    Директории в архивах тоже создаются в MinIO.
+    Загружает файлы и архивы (zip, tar, tar.gz, tgz, gz) в MinIO
     """
     uploaded_files_metadata = []
 
@@ -35,7 +34,7 @@ async def upload_files(
         ".gz": GzArchiveHandler(),
     }
 
-    for file in files:
+    for file in files_list:
         filename = file.filename.lower()
         matched_handler = None
         for ext, handler in handlers_map.items():
@@ -44,53 +43,50 @@ async def upload_files(
                 break
 
         if matched_handler:
-            matched_handler.extract_and_upload(file, current_user, db, uploaded_files_metadata)
+            matched_handler.extract_and_upload(file, current_user, uploaded_files_metadata, custom_dir)
         else:
-            _save_file_stream_to_minio_and_db(file.file, file.filename, current_user, db, uploaded_files_metadata)
+            save_file_stream_to_minio_and_db(file.file, file.filename, current_user, uploaded_files_metadata)
 
     return uploaded_files_metadata
 
-@fileRouter.get("/all", response_model=List[schemas.File])
+@fileRouter.get("/all", response_model=List[file_dto.FileDto])
 def get_all_files(
     skip: int = 0,
     limit: int = 100,
     search: str = None,
-    current_user: schemas.User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    current_user: UserDbDto = Depends(auth_repository.get_current_active_user),
 ):
     """Получает список файлов пользователя с возможностью поиска."""
-    files = crud.get_files_by_owner(db, owner_id=current_user.id, skip=skip, limit=limit, search=search)
-    return files
+    return file_repository.get_files_by_owner(owner_id=current_user.id, skip=skip, limit=limit, search=search)
 
-@fileRouter.get("/get", response_model=schemas.File)
+@fileRouter.get("/get", response_model=file_dto.FileDto)
 async def get_file(
-    file_id: int,
-    request: Request,
-    current_user: schemas.User = Depends(get_current_active_user),
-    db: Session = Depends(get_db),
+    file_id: str,
+    range_header: Optional[str] = Header(None, alias="Range"),
+    current_user: UserDbDto = Depends(auth_repository.get_current_active_user),
 ):
     """Скачивает файл, поддерживая частичную загрузку (byte range)."""
 
-    from ..services.minio import Chunk
-    from ..services.minio import Full
+    from ..services.minio import Chunk, Full
 
-    db_file = crud.get_file(db, file_id=file_id)
+    db_file = file_repository.get_file(file_id=file_id)
     if db_file is None:
         raise HTTPException(status_code=404, detail="File not found")
     if db_file.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this file")
 
-    range_header = request.headers.get("Range")
-
     try:
         if range_header:
             # Частичная загрузка
+            import re
             byte1, byte2 = 0, db_file.size_bytes - 1
-            if range_header:
-                match = re.search(r"(\d+)-(\d*)", range_header)
-                groups = match.groups()
-                if groups[0]: byte1 = int(groups[0])
-                if groups[1]: byte2 = int(groups[1])
+            match = re.search(r"(\d+)-(\d*)", range_header)
+            if match:
+                g1, g2 = match.groups()
+                if g1:
+                    byte1 = int(g1)
+                if g2:
+                    byte2 = int(g2)
 
             length = byte2 - byte1 + 1
             stream = get_object(object_name=db_file.minio_object_name, params=Chunk(first_byte=byte1, length=length))
@@ -104,23 +100,21 @@ async def get_file(
             return StreamingResponse(stream, status_code=206, headers=headers)
         else:
             # Полная загрузка
-            response = get_object(object_name=db_file.minio_object_name, params=Full(db_file.size_bytes))
-            stream = response.stream(db_file.size_bytes)
-            response.close()
+            stream = get_object(object_name=db_file.minio_object_name, params=Full(file_length=db_file.size_bytes))
             return StreamingResponse(stream, media_type=db_file.mime_type)
 
     except Exception as e:
+        logging.error(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @fileRouter.delete("/remove", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(
-    file_id: int,
-    current_user: schemas.User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    file_id: str,
+    current_user: UserDbDto = Depends(auth_repository.get_current_active_user),
 ):
     """Удаляет файл из MinIO и его метаданные из PostgreSQL."""
-    db_file = crud.get_file(db, file_id=file_id)
+    db_file = file_repository.get_file(file_id=file_id)
     if db_file is None:
         raise HTTPException(status_code=404, detail="File not found")
     if db_file.owner_id != current_user.id:
@@ -130,6 +124,10 @@ async def delete_file(
     remove_object(object_name=db_file.minio_object_name)
 
     # Удаление из БД
-    crud.delete_file(db, file_id=file_id)
+    file_repository.delete_file(file_id=file_id)
 
     return
+
+@fileRouter.get("/all_files", response_model=List[file_dto.FileDto])
+async def files():
+    return file_repository.get_all_files()
