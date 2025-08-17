@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+
+NETWORK_NAME="pixelplayer_app-network"
+SUBNET=$(cat .env | grep "SUBNET" | sed "s/SUBNET=//")
+
+echo "
+#######################################
+#pixelplayer start script was launched#
+#######################################
+"
+
+if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then
+	echo "Network $NETWORK_NAME not found. Creating..."
+	docker network create --driver bridge --subnet "$SUBNET" "$NETWORK_NAME"
+	echo "Network $NETWORK_NAME was created with subnet $SUBNET"
+else
+	echo "✅ Network $NETWORK_NAME is already exists"
+fi
+
+echo "⏳ Launching containers..."
+docker compose up -d --build
+
+echo "✅ Ready! Containers are running, network $NETWORK_NAME is in use"

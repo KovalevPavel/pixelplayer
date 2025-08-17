@@ -97,7 +97,7 @@ async def get_file(
                 'Content-Length': str(length),
                 'Content-Type': db_file.mime_type
             }
-            return StreamingResponse(stream, status_code=206, headers=headers)
+            return StreamingResponse(stream, status_code=206, headers=headers, media_type=db_file.mime_type)
         else:
             # Полная загрузка
             stream = get_object(object_name=db_file.minio_object_name, params=Full(file_length=db_file.size_bytes))

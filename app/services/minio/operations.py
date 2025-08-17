@@ -1,9 +1,10 @@
 import logging
+import uuid
 
 from minio import S3Error
 
 from .minio_client import minio_client
-from .base_min_obj import BaseMinObj, MinFile, CHUNK_SIZE
+from .base_min_obj import BaseMinObj
 from .offset_handler import BaseFileParams, Chunk, Full
 from ...core import config
 
@@ -41,7 +42,6 @@ def put_object(file: BaseMinObj):
             object_name=file.object_name,
             data=file.data,
             length=file.length,
-            part_size=CHUNK_SIZE if isinstance(file, MinFile) else 0,
             content_type=file.content_type,
         )
     except S3Error as e:

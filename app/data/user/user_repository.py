@@ -35,18 +35,12 @@ def delete_user(user_id: str):
     smth = select(UserDbDto).options(selectinload(UserDbDto.files)).where(UserDbDto.id == user_id)
 
     with next(get_db()) as session:
-        # db_user = (
-        #     session.query(UserDto)
-        #     .options(selectinload(UserDto.files))
-        #     .filter(UserDto.id == user_id)
-        #     .first()
-        # )
-        db_user = session.execute(smth).first()
+        db_user = session.scalar(smth)
 
         if not db_user:
             return None
 
-        user_prefix = db_user.username
+        user_prefix = db_user.id
 
         try:
             # Проверяем, есть ли объекты с таким префиксом
@@ -76,7 +70,7 @@ def get_user_by_username(username: str) -> Union[UserDbDto, None]:
     """
     smth = select(UserDbDto).where(UserDbDto.username == username)
     with next(get_db()) as session:
-        return session.execute(smth).first()
+        return session.scalar(smth)
 
 def create_user(user: UserCreateDto):
     """

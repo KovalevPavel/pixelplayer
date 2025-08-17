@@ -72,7 +72,7 @@ class FileDbDto(Base):
     """
     __tablename__ = "files"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid_generator)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
     original_name: Mapped[str] = mapped_column(String, nullable=False)
     minio_object_name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)

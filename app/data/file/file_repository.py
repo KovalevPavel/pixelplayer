@@ -2,7 +2,7 @@ from typing import List
 
 from sqlalchemy import select
 
-from app.db.database import get_db, SessionLocal
+from app.db.database import get_db
 from .file_dto import FileCreateDto
 from ...db.db_dto import FileDbDto
 
@@ -20,7 +20,7 @@ def get_file(file_id: str) -> FileDbDto | None:
     """
     smth = select(FileDbDto).where(FileDbDto.id == file_id)
     with next(get_db()) as session:
-        return session.scalars(smth).first()
+        return session.scalar(smth)
 
 def get_files_by_owner(owner_id: str, skip: int = 0, limit: int = 100, search: str = None) -> List[FileDbDto]:
     """

@@ -1,6 +1,9 @@
 import logging
 import mimetypes
+import os.path
+import uuid
 from abc import ABC
+from io import BytesIO
 from typing import Union
 
 from minio import S3Error
@@ -9,9 +12,7 @@ import zipfile
 import tarfile
 import gzip
 
-from . import MinFile
-from .base_min_obj import CHUNK_SIZE
-from .stream_wrapper import StreamWrapper
+from .base_min_obj import MinFile
 from ...data.file.file_dto import FileCreateDto
 from .operations import put_object, remove_object
 from ...data.file import file_dto, file_repository
@@ -98,31 +99,34 @@ def save_file_stream_to_minio_and_db(stream, original_name: str, current_user, r
     custom_dir : Union[str, None]
         дополнительная директория. Указывается в том случае, если архив загружается не в корень директории пользователя в MinIO
     """
+    
+    # убирам лишнее, если есть
     sanitized_dir = custom_dir.strip("/") if custom_dir else None
-    minio_object_name = f"{current_user.username}/{original_name}"
+
+    # cтроим путь до файла относительно кастомной директории (если есть)
+    final_original_name = f"{sanitized_dir}/{original_name}" if sanitized_dir else original_name
+
+    file_id = str(uuid.uuid4())
+
+    # приведенное имя в структуре minio
+    minio_object_name = __get_filename(raw_name=final_original_name, file_id=file_id)
+    minio_object_name = f"{current_user.id}/{minio_object_name}"
+
     mime_type = _guess_mime_type(original_name)
 
     # Вычисляем длину (если знаем), иначе MinIO будет читать поток до конца
     content_bytes = stream.read()
     length = len(content_bytes)
 
-    def file_generator():
-        while True:
-            chunk = stream.read(CHUNK_SIZE)
-            if not chunk:
-                break
-            yield chunk
-
-    wrapped_stresam = StreamWrapper(file_generator())
-
     try:
-        put_object(MinFile(file_name=minio_object_name, stream_wrapper=wrapped_stresam, content_type=mime_type))
+        put_object(MinFile(file_name=minio_object_name, data=BytesIO(content_bytes), content_type=mime_type, length=length))
 
     except S3Error as err:
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки файла: {err.code}: {err.message}")
 
     file_meta = FileCreateDto(
-        original_name=f"{sanitized_dir}/{original_name}",
+        id=file_id,
+        original_name=final_original_name,
         minio_object_name=minio_object_name,
         size_bytes=length,  # если можно, можно вычислить длину заранее и прокинуть сюда
         mime_type=mime_type
@@ -140,3 +144,14 @@ def save_file_stream_to_minio_and_db(stream, original_name: str, current_user, r
         raise HTTPException(status_code=500, detail=f"Ошибка сохранения метаданных файла: {str(err)}")
 
     result_list.append(file_dto.FileDto.model_validate(db_file))
+
+def __get_filename(raw_name: str, file_id: str) -> str:
+    minio_filename_data = os.path.basename(raw_name).split('.')
+    count = len(minio_filename_data)
+
+    if count == 1:
+        ext = None
+    else:
+        ext = minio_filename_data[-1]
+
+    return f"{file_id}.{ext}" if ext else f"{file_id}"

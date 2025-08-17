@@ -2,6 +2,8 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
+from ..file import file_dto
+
 class UserBaseDto(BaseModel):
     """
     Базовая схема для пользователя (для чтения из БД)
@@ -19,7 +21,7 @@ class UserDto(UserBaseDto):
     pass
 
 class UserWithFilesDto(UserBaseDto):
-    files: List[BaseModel]
+    files: List[file_dto.FileWithHierarchyDto]
 
 class UserCreateDto(BaseModel):
     """

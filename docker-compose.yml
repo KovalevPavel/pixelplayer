@@ -44,10 +44,32 @@ services:
     networks:
       - app-network
 
+  # MinIO Client для конфигурации
+  mc:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    networks:
+      - app-network
+    entrypoint: >
+      /bin/sh -c "
+        echo '⏳ Waiting for MinIO...';
+        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do
+          echo '... MinIO still not ready, waiting for 2s';
+          sleep 2;
+        done;
+        echo '✅ MinIO is awailable, craeting bucket...';
+        mc mb -p local/${MINIO_BUCKET} || true;
+        mc anonymous set download local/${MINIO_BUCKET} || true; # загрузка по прямой ссылке
+        echo '✅ Bucket is ready!';
+        exit 0;
+      "
+
 volumes:
   postgres_data:
   minio_data:
 
 networks:
   app-network:
-    driver: bridge
+    external: true
+    name: pixelplayer_app-network

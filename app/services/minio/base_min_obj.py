@@ -1,9 +1,6 @@
 from abc import ABC
 from io import BytesIO
-
-from app.services.minio.stream_wrapper import StreamWrapper
-
-CHUNK_SIZE = 5 * 1024 * 1024
+from typing import Any
 
 class BaseMinObj(ABC):
     """
@@ -19,10 +16,8 @@ class MinFile(BaseMinObj):
     """
     Файл
     """
-    def __init__(self, file_name: str, stream_wrapper: StreamWrapper, content_type: str):
+    def __init__(self, file_name: str, data: BytesIO, content_type: str, length: int):
         self.content_type = content_type
-        self.data = stream_wrapper
+        self.data = BytesIO(data.read())
         self.object_name = file_name
-
-    data: StreamWrapper
-    length = -1
+        self.length = length
