@@ -19,6 +19,6 @@ else
 fi
 
 echo "⏳ Launching containers..."
-docker compose up -d --build
+docker-compose up -d --build
 
 echo "✅ Ready! Containers are running, network $NETWORK_NAME is in use"
