@@ -1,0 +1,72 @@
+services:
+  # FastAPI приложение
+  app:
+    build: .
+    env_file: .env
+    container_name: pixelplayer-app
+    depends_on:
+      db:
+        condition: service_healthy # Ждем, пока БД будет готова
+      minio:
+        condition: service_started
+    networks:
+      - proxy
+      - backend
+
+  # База данных PostgreSQL
+  db:
+    image: postgres:16
+    container_name: pixelplayer-db
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bachend
+
+  # Хранилище MinIO
+  minio:
+    image: minio/minio
+    container_name: pixelplayer-minio
+    env_file: .env
+    command: server --console-address ":9001" /data
+    volumes:
+      - ./minio_data:/data
+    networks:
+      - proxy
+      - bachend
+    expose:
+      - "9000" # API
+      - "9001" # UI
+
+  # MinIO Client для конфигурации
+  mc:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    networks:
+      - backend
+    entrypoint: >
+      /bin/sh -c "
+        echo '⏳ Waiting for MinIO...';
+        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do
+          echo '... MinIO still not ready, waiting for 2s';
+          sleep 2;
+        done;
+        echo '✅ MinIO is awailable, craeting bucket...';
+        mc mb -p local/${MINIO_BUCKET} || true;
+        mc anonymous set download local/${MINIO_BUCKET} || true; # загрузка по прямой ссылке
+        echo '✅ Bucket is ready!';
+        exit 0;
+      "
+
+networks:
+  proxy:
+    external: true
+  backend:
+    driver: bridge
