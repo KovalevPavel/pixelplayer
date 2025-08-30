@@ -15,6 +15,7 @@ app = FastAPI(
     title="File Storage Service",
     description="A service to store and manage files with user authentication.",
     version="1.0.0",
+    root_path="/api",
 )
 
 # Подключаем роутеры с нашими эндпоинтами

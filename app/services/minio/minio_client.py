@@ -9,7 +9,7 @@ minio_client = Minio(
     access_key=config.MINIO_ACCESS_KEY,
     secret_key=config.MINIO_SECRET_KEY,
     # Мы внутри Docker-сети, можно использовать http
-    secure=False
+    secure=config.MINIO_USE_HTTPS,
 )
 
 # Создаем бакет, если он не существует
