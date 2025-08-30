@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from starlette.templating import Jinja2Templates
 
-from .db.database import engine, Base
 from .api.api_files import fileRouter
 from .api.api_user import authRouter
+from .db.database import Base, engine
 
 # Создаем таблицы в БД на основе моделей SQLAlchemy
 # В реальном продакшене для миграций лучше использовать Alembic

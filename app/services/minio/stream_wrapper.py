@@ -1,9 +1,11 @@
 import io
 
+
 class StreamWrapper(io.RawIOBase):
     """
     Обертка для stream'а
     """
+
     def __init__(self, generator):
         super().__init__()
         self.generator = generator

@@ -1,4 +1,5 @@
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -6,7 +7,7 @@ load_dotenv()
 # PostgreSQL
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-POSTGRES_SERVER = os.getenv("POSTGRES_SERVER", "db") # 'db' - имя сервиса в docker-compose
+POSTGRES_SERVER = os.getenv("POSTGRES_SERVER", "db")  # 'db' - имя сервиса в docker-compose
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_SERVER}/{POSTGRES_DB}"
 

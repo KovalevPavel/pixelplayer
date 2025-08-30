@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import List
 
-from sqlalchemy import BigInteger, ForeignKey, DateTime, String
-from sqlalchemy.orm import relationship, mapped_column, Mapped
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from .database import Base, uuid_generator
+
 
 class UserDbDto(Base):
     """
@@ -26,6 +27,7 @@ class UserDbDto(Base):
     files
         файлы текущего пользователя
     """
+
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(primary_key=True, default=uuid_generator)
@@ -38,8 +40,9 @@ class UserDbDto(Base):
         "FileDbDto",
         back_populates="owner",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
     )
+
 
 class FileDbDto(Base):
     """
@@ -70,6 +73,7 @@ class FileDbDto(Base):
     owner
         ссылка на модель овнера. Связь только для каскадного удаления, без необходимости тянуть весь объект
     """
+
     __tablename__ = "files"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
@@ -79,9 +83,6 @@ class FileDbDto(Base):
     mime_type: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    owner_id: Mapped[str] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
-    )
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     owner: Mapped["UserDbDto"] = relationship(back_populates="files")

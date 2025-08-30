@@ -2,6 +2,7 @@ import logging
 
 from minio import Minio
 from minio.error import S3Error
+
 from ...core import config
 
 minio_client = Minio(

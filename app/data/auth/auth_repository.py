@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
@@ -6,18 +6,20 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
 from app.core import config
-
-from .token_dto import TokenDataDto
 from app.data.user.user_repository import get_user_by_username
 from app.db.db_dto import UserDbDto
+
 from ..utils import __pwd_context
+from .token_dto import TokenDataDto
 
 # Схема аутентификации OAuth2. 'tokenUrl' указывает на наш эндпоинт получения токена.
 __oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/user/auth")
 
+
 def verify_password(plain_password, hashed_password):
     """Верификация пароля"""
     return __pwd_context.verify(plain_password, hashed_password)
+
 
 def get_current_active_user(token: str = Depends(__oauth2_scheme)):
     """
@@ -42,6 +44,7 @@ def get_current_active_user(token: str = Depends(__oauth2_scheme)):
         raise credentials_exception
     return user
 
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
     Создание access token'а
@@ -53,6 +56,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
     encoded_jwt = jwt.encode(to_encode, config.SECRET_KEY, algorithm=config.ALGORITHM)
     return encoded_jwt
+
 
 def try_authenticate_user(username: str, password: str) -> UserDbDto | None:
     """

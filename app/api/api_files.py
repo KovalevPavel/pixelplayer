@@ -1,10 +1,13 @@
 import logging
 from typing import List, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File as FastAPIFile, Header
+from fastapi import APIRouter, Depends
+from fastapi import File as FastAPIFile
+from fastapi import Header, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from app.services.minio.archive_handler import ZipArchiveHandler, TarArchiveHandler, GzArchiveHandler
+from app.services.minio.archive_handler import GzArchiveHandler, TarArchiveHandler, ZipArchiveHandler
+
 from ..data.auth import auth_repository
 from ..data.file import file_dto, file_repository
 from ..db.db_dto import UserDbDto
@@ -12,6 +15,7 @@ from ..services.minio.archive_handler import save_file_stream_to_minio_and_db
 from ..services.minio.operations import get_object, remove_object
 
 fileRouter = APIRouter(prefix="/files")
+
 
 @fileRouter.post("/upload", response_model=List[file_dto.FileDto])
 async def upload_files(
@@ -47,6 +51,7 @@ async def upload_files(
 
     return uploaded_files_metadata
 
+
 @fileRouter.get("/all", response_model=List[file_dto.FileDto])
 def get_all_files(
     skip: int = 0,
@@ -56,6 +61,7 @@ def get_all_files(
 ):
     """Получает список файлов пользователя с возможностью поиска."""
     return file_repository.get_files_by_owner(owner_id=current_user.id, skip=skip, limit=limit, search=search)
+
 
 @fileRouter.get("/get", response_model=file_dto.FileDto)
 async def get_file(
@@ -77,6 +83,7 @@ async def get_file(
         if range_header:
             # Частичная загрузка
             import re
+
             byte1, byte2 = 0, db_file.size_bytes - 1
             match = re.search(r"(\d+)-(\d*)", range_header)
             if match:
@@ -87,18 +94,24 @@ async def get_file(
                     byte2 = int(g2)
 
             length = byte2 - byte1 + 1
-            stream = get_object(object_name=db_file.minio_object_name, params=Chunk(first_byte=byte1, length=length))
+            stream = get_object(
+                object_name=db_file.minio_object_name,
+                params=Chunk(first_byte=byte1, length=length),
+            )
 
             headers = {
-                'Content-Range': f'bytes {byte1}-{byte2}/{db_file.size_bytes}',
-                'Accept-Ranges': 'bytes',
-                'Content-Length': str(length),
-                'Content-Type': db_file.mime_type
+                "Content-Range": f"bytes {byte1}-{byte2}/{db_file.size_bytes}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(length),
+                "Content-Type": db_file.mime_type,
             }
             return StreamingResponse(stream, status_code=206, headers=headers, media_type=db_file.mime_type)
         else:
             # Полная загрузка
-            stream = get_object(object_name=db_file.minio_object_name, params=Full(file_length=db_file.size_bytes))
+            stream = get_object(
+                object_name=db_file.minio_object_name,
+                params=Full(file_length=db_file.size_bytes),
+            )
             return StreamingResponse(stream, media_type=db_file.mime_type)
 
     except Exception as e:
@@ -125,6 +138,7 @@ async def delete_file(
     file_repository.delete_file(file_id=file_id)
 
     return
+
 
 @fileRouter.get("/all_files", response_model=List[file_dto.FileDto])
 async def files():

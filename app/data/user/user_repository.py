@@ -2,22 +2,22 @@
 Репозиторий для получения данных из БД
 """
 
-from typing import Union, List
 import logging
+from typing import List, Union
 
 from fastapi import HTTPException
-
 from minio import S3Error
 from minio.deleteobjects import DeleteObject
-
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from .user_dto import UserCreateDto
 from app.db.database import get_db
-from ..utils import get_string_hash
+
 from ...db.db_dto import UserDbDto
 from ...services.minio import list_objects, remove_objects
+from ..utils import get_string_hash
+from .user_dto import UserCreateDto
+
 
 def get_user(user_id: str):
     """
@@ -26,6 +26,7 @@ def get_user(user_id: str):
     smth = select(UserDbDto).where(UserDbDto.id == user_id)
     with next(get_db()) as session:
         return session.scalars(smth).first()
+
 
 def delete_user(user_id: str):
     """
@@ -64,6 +65,7 @@ def delete_user(user_id: str):
         except S3Error as err:
             raise HTTPException(status_code=500, detail=f"Ошибка при удалении из MinIO: {err.message}")
 
+
 def get_user_by_username(username: str) -> Union[UserDbDto, None]:
     """
     Получение информации о пользователе по его имени
@@ -71,6 +73,7 @@ def get_user_by_username(username: str) -> Union[UserDbDto, None]:
     smth = select(UserDbDto).where(UserDbDto.username == username)
     with next(get_db()) as session:
         return session.scalar(smth)
+
 
 def create_user(user: UserCreateDto):
     """
@@ -83,6 +86,7 @@ def create_user(user: UserCreateDto):
         session.commit()
         session.refresh(db_user)
         return db_user
+
 
 def get_all_users() -> List[UserDbDto]:
     """
