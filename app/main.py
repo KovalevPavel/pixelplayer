@@ -21,7 +21,3 @@ app = FastAPI(
 # Подключаем роутеры с нашими эндпоинтами
 app.include_router(authRouter, prefix="/v1", tags=["api_auth"])
 app.include_router(fileRouter, prefix="/v1", tags=["api_files"])
-
-@app.get("/", tags=["Root"])
-def read_root():
-    return {"message": "Welcome to the File Storage API. Go to /docs for API documentation."}

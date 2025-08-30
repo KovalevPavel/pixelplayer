@@ -1,12 +1,12 @@
 import logging
-import uuid
 
 from minio import S3Error
 
-from .minio_client import minio_client
 from .base_min_obj import BaseMinObj
+from .minio_client import minio_client
 from .offset_handler import BaseFileParams, Chunk, Full
 from ...core import config
+
 
 def get_object(object_name: str, params: BaseFileParams):
     """
