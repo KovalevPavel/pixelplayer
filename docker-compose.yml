@@ -27,7 +27,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - bachend
+      - backend
 
   # Хранилище MinIO
   minio:
@@ -39,7 +39,7 @@ services:
       - ./minio_data:/data
     networks:
       - proxy
-      - bachend
+      - backend
     expose:
       - "9000" # API
       - "9001" # UI
@@ -64,6 +64,10 @@ services:
         echo '✅ Bucket is ready!';
         exit 0;
       "
+
+volumes:
+  postgres_data:
+  minio_data:
 
 networks:
   proxy:
