@@ -6,16 +6,14 @@ from fastapi import File as FastAPIFile
 from fastapi import Header, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from app.services.archive_handler.archive_handler import (
-    GzArchiveHandler,
-    TarArchiveHandler,
-    ZipArchiveHandler,
-    save_file_stream_to_minio_and_db,
-)
+from app.services.archive_handler.handlers.gz_handler import GzArchiveHandler
+from app.services.archive_handler.handlers.tar_handler import TarArchiveHandler
+from app.services.archive_handler.handlers.zip_handler import ZipArchiveHandler
 
 from ..data.auth import auth_repository
 from ..data.file import file_dto, file_repository
 from ..db.db_dto import UserDbDto
+from ..services.archive_handler.utils import save_file_stream_to_minio_and_db
 from ..services.minio.operations import get_object, remove_object
 
 fileRouter = APIRouter(prefix="/files")
