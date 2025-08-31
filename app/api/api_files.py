@@ -6,12 +6,16 @@ from fastapi import File as FastAPIFile
 from fastapi import Header, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from app.services.minio.archive_handler import GzArchiveHandler, TarArchiveHandler, ZipArchiveHandler
+from app.services.archive_handler.archive_handler import (
+    GzArchiveHandler,
+    TarArchiveHandler,
+    ZipArchiveHandler,
+    save_file_stream_to_minio_and_db,
+)
 
 from ..data.auth import auth_repository
 from ..data.file import file_dto, file_repository
 from ..db.db_dto import UserDbDto
-from ..services.minio.archive_handler import save_file_stream_to_minio_and_db
 from ..services.minio.operations import get_object, remove_object
 
 fileRouter = APIRouter(prefix="/files")
@@ -71,7 +75,7 @@ async def get_file(
 ):
     """Скачивает файл, поддерживая частичную загрузку (byte range)."""
 
-    from ..services.minio import Chunk, Full
+    from ..services.minio.offset_handler import Chunk, Full
 
     db_file = file_repository.get_file(file_id=file_id)
     if db_file is None:
