@@ -9,7 +9,10 @@ from ..core.config import DATABASE_URL
 # Базовый класс для всех наших моделей SQLAlchemy
 Base = declarative_base()
 
-uuid_generator = lambda: str(uuid.uuid4())
+
+def random_uuid():
+    return str(uuid.uuid4())
+
 
 # Создаем "движок" для подключения к БД
 engine = create_engine(DATABASE_URL)

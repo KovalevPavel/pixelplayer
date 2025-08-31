@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 from app.db.database import get_db
 
 from ...db.db_dto import UserDbDto
-from ...services.minio import list_objects, remove_objects
+from ...services.minio.operations import list_objects, remove_objects
 from ..utils import get_string_hash
 from .user_dto import UserCreateDto
 

@@ -5,7 +5,7 @@ from sqlalchemy import BigInteger, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from .database import Base, uuid_generator
+from .database import Base, random_uuid
 
 
 class UserDbDto(Base):
@@ -30,7 +30,7 @@ class UserDbDto(Base):
 
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(primary_key=True, default=uuid_generator)
+    id: Mapped[str] = mapped_column(primary_key=True, default=random_uuid)
     username: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
