@@ -33,3 +33,7 @@ class ArchiveHandler(ABC):
             Указывается в том случае, если архив загружается не в корень директории пользователя в MinIO
         """
         pass
+
+
+def get_archive_handler() -> ArchiveHandler:
+    pass

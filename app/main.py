@@ -3,11 +3,9 @@ from starlette.templating import Jinja2Templates
 
 from .api.api_files import fileRouter
 from .api.api_user import authRouter
-from .db.database import Base, engine
+from .db.factory import init_database
 
-# Создаем таблицы в БД на основе моделей SQLAlchemy
-# В реальном продакшене для миграций лучше использовать Alembic
-Base.metadata.create_all(bind=engine)
+init_database()
 
 templates = Jinja2Templates(directory="app/templates")
 

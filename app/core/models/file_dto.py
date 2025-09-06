@@ -46,6 +46,7 @@ class FileCreateDto(BaseModel):
     album: Optional[str]
     artist: Optional[str]
     genre: Optional[str]
+    cover: Optional[str]
 
 
 class FileDto(BaseModel):

@@ -1,11 +1,15 @@
 import logging
+from io import BytesIO
+from typing import Optional
 
+from fastapi import HTTPException
 from minio import S3Error
+from minio.deleteobjects import DeleteObject
 
-from ...core import config
-from .base_min_obj import BaseMinObj
-from .minio_client import minio_client
-from .offset_handler import BaseFileParams, Chunk, Full
+from ..core import config
+from ._minio_client import minio_client
+from .minio_file import BaseMinObj
+from .minio_file_params import BaseFileParams, Chunk, Full
 
 
 def get_object(object_name: str, params: BaseFileParams):
@@ -43,23 +47,26 @@ def put_object(file: BaseMinObj):
     """
     Сохранение объекта
     """
+    input_stream = BytesIO(file.data)
     try:
         minio_client.put_object(
             config.MINIO_BUCKET,
             object_name=file.object_name,
-            data=file.data,
-            length=file.length,
+            data=input_stream,
+            length=len(file.data),
             content_type=file.content_type,
         )
     except S3Error as e:
         logging.error(f"Ошибка при загрузке файла: {e.code}: {e.message}")
         raise e
     finally:
-        file.data.close()
+        input_stream.close()
 
 
 def remove_object(object_name):
-    """Удаление объекта из MinIO"""
+    """
+    Удаление объекта из MinIO
+    """
     try:
         return minio_client.remove_object(config.MINIO_BUCKET, object_name)
     except S3Error as e:
@@ -74,3 +81,24 @@ def remove_objects(objects):
     except S3Error as e:
         logging.error(f"Error while removing file: {e}")
         raise e
+
+
+def remove_files_by_user(username: str) -> Optional[int]:
+    # Проверяем, есть ли объекты с таким префиксом
+    objects_to_delete = list(list_objects(user_prefix=username))
+
+    if not objects_to_delete:
+        return None
+
+    try:
+        # Формируем генератор для удаления пачкой
+        delete_objects = (DeleteObject(obj.object_name) for obj in objects_to_delete)
+        errors = remove_objects(delete_objects)
+        # Логируем ошибки
+        for err in errors:
+            logging.error(f"Ошибка удаления файла {err.object_name}: {err}")
+
+        return len(errors)
+
+    except S3Error as err:
+        raise HTTPException(status_code=500, detail=f"Ошибка при удалении из MinIO: {err.message}")

@@ -5,10 +5,10 @@ from sqlalchemy import BigInteger, DateTime, ForeignKey, SmallInteger, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from .database import Base, random_uuid
+from ._utils import Base, random_uuid
 
 
-class UserDbDto(Base):
+class UserDbEntity(Base):
     """
     Таблица с данными пользователей
 
@@ -36,15 +36,15 @@ class UserDbDto(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Каскадное удаление файлов при удалении пользователя
-    files: Mapped[List["FileDbDto"]] = relationship(
-        "FileDbDto",
+    files: Mapped[List["FileDbEntity"]] = relationship(
+        "FileDbEntity",
         back_populates="owner",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
 
 
-class FileDbDto(Base):
+class FileDbEntity(Base):
     """
     Таблица с файлами пользователей
 
@@ -88,6 +88,7 @@ class FileDbDto(Base):
     album: Mapped[str] = mapped_column(String, nullable=True)
     artist: Mapped[str] = mapped_column(String, nullable=True)
     genre: Mapped[str] = mapped_column(String, nullable=True)
+    cover: Mapped[str] = mapped_column(String, nullable=True)
 
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    owner: Mapped["UserDbDto"] = relationship(back_populates="files")
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    owner: Mapped["UserDbEntity"] = relationship(back_populates="files")

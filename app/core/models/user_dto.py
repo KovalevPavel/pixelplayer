@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from ..file import file_dto
+from app.core.models.file_dto import FileWithHierarchyDto
 
 
 class UserBaseDto(BaseModel):
@@ -26,7 +26,7 @@ class UserDto(UserBaseDto):
 
 
 class UserWithFilesDto(UserBaseDto):
-    files: List[file_dto.FileWithHierarchyDto]
+    files: List[FileWithHierarchyDto]
 
 
 class UserCreateDto(BaseModel):

@@ -7,10 +7,10 @@ from mutagen.mp3 import MP3
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
+from ._parsers.flac_parser import FLACParser
+from ._parsers.mp3_parser import MP3Parser
+from ._parsers.ogg_parser import OggParser
 from .base_meta_parser import BaseMetaParser
-from .parsers.flac_parser import FLACParser
-from .parsers.mp3_parser import MP3Parser
-from .parsers.ogg_parser import OggParser
 
 
 def get_parser(content_bytes: bytes) -> Optional[BaseMetaParser]:

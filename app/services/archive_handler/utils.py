@@ -3,18 +3,17 @@ import mimetypes
 import os.path
 import re
 import uuid
-from io import BytesIO
 from os import path
 from typing import Union
 
 from fastapi import HTTPException
 from minio import S3Error
 
-from ...data.file import file_dto, file_repository
-from ...data.file.file_dto import FileCreateDto
+from ...core.models.file_dto import FileCreateDto, FileDto
+from ...db import audio_repository
+from ...minio import minio_repository
+from ...minio.minio_file import MinioFile
 from ..meta_parser.factory import get_parser
-from ..minio.base_min_obj import MinFile
-from ..minio.operations import put_object, remove_object
 
 
 def get_track_number(raw: Union[str, None]) -> int:
@@ -80,12 +79,11 @@ def save_file_stream_to_minio_and_db(
         return
 
     try:
-        put_object(
-            MinFile(
-                file_name=minio_object_name,
-                data=BytesIO(content_bytes),
+        minio_repository.put_object(
+            MinioFile(
+                object_name=minio_object_name,
+                data=content_bytes,
                 content_type=mime_type,
-                length=length,
             )
         )
 
@@ -106,14 +104,15 @@ def save_file_stream_to_minio_and_db(
         album=meta_from_file.album,
         artist=meta_from_file.artist,
         genre=meta_from_file.genre,
+        cover=None,
     )
 
     try:
-        db_file = file_repository.create_file(file=file_meta, owner_id=current_user.id)
+        db_file = audio_repository.create_file(file=file_meta, owner_id=current_user.id)
     except Exception as err:
         # Если ошибка при сохранении в БД — можно удалить файл из MinIO, чтобы не было мусора
         try:
-            remove_object(object_name=minio_object_name)
+            minio_repository.remove_object(object_name=minio_object_name)
         except S3Error as s3err:
             logging.error(f"Ошибка удаления файла: {s3err.code}: {s3err.message}")
 
@@ -122,7 +121,7 @@ def save_file_stream_to_minio_and_db(
     result = parser.extract_cover()
     logging.warning(f"cover: {result}")
 
-    result_list.append(file_dto.FileDto.model_validate(db_file))
+    result_list.append(FileDto.model_validate(db_file))
 
 
 def _guess_mime_type(filename: str) -> str:
