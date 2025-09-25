@@ -1,8 +1,6 @@
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
-
-from app.core.models.file_dto import FileWithHierarchyDto
 
 
 class UserBaseDto(BaseModel):
@@ -26,8 +24,10 @@ class UserDto(UserBaseDto):
     pass
 
 
-class UserWithFilesDto(UserBaseDto):
-    files: List[FileWithHierarchyDto]
+class UserWithFilesDto(BaseModel):
+    id: str
+    username: str
+    features: dict[str, bool]
 
 
 class UserCreateDto(BaseModel):

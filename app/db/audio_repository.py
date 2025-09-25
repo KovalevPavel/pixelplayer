@@ -72,22 +72,71 @@ def delete_file(file_id: str):
             session.commit()
     return db_file
 
+def get_feature_awailability(owner_id: str) -> dict[str, bool]:
+    albums_query = select(AudioFileDbEntity.album).where(AudioFileDbEntity.owner_id == owner_id)
+    artists_query = select(AudioFileDbEntity.artist).where(AudioFileDbEntity.owner_id == owner_id)
+    genres_query = select(AudioFileDbEntity.genre).where(AudioFileDbEntity.owner_id == owner_id)
 
-# def get_files_json(self, user_id: str) -> List[FileWithHierarchyDto]:
-#     files = get_files_by_owner(owner_id=user_id)
-#     result = list(
-#         map(
-#             lambda file: __map_to_file_with_hierarchy(file),
-#             files,
-#         )
-#     )
-#     return result
-#
-# def __map_to_file_with_hierarchy(self, file: FileDbEntity) -> FileWithHierarchyDto:
-#     return FileWithHierarchyDto(
-#         id=file.id,
-#         original_name=file.original_name,
-#         size_bytes=file.size_bytes,
-#         mime_type=file.mime_type,
-#         minio_object_name=file.minio_object_name,
-#     )
+    tracks_exists = False
+    genres_exists = False
+    albums_exists = False
+    artists_exists = False
+
+    def __get_res():
+        return {
+            "tracks": tracks_exists,
+            "genres": genres_exists,
+            "albums": albums_exists,
+            "artists": artists_exists,
+        }
+
+    with next(get_db()) as session:
+        is_at_least_one_track_exists = (
+            True
+            if session.query(AudioFileDbEntity)
+            .where(AudioFileDbEntity.owner_id == owner_id)
+            .first()
+            else False
+        )
+        if not is_at_least_one_track_exists:
+            return __get_res()
+        else:
+            tracks_exists = True
+ 
+        genres = [
+            genre for genre in session.scalars(genres_query).unique()
+            if genre
+        ]
+        if len(genres) > 0:
+            genres_exists = True
+
+        albums = [
+            genre for genre in session.scalars(albums_query).unique()
+            if genre
+        ]
+        if len(albums) > 0:
+            albums_exists = True
+
+        artists = [
+            genre for genre in session.scalars(artists_query).unique()
+            if genre
+        ]
+        if len(artists) > 0:
+            artists_exists = True
+
+        return __get_res()
+
+def get_genres(owner_id: str) -> List[str]:
+    smth = select(AudioFileDbEntity.genre).where(AudioFileDbEntity.owner_id == owner_id)
+    with next(get_db()) as session:
+        return [genre for genre in session.scalars(smth).unique() if genre]
+
+def get_albums(owner_id: str) -> List[str]:
+    smth = select(AudioFileDbEntity.album).where(AudioFileDbEntity.owner_id == owner_id)
+    with next(get_db()) as session:
+        return session.scalars(smth).unique()
+
+def get_artists(owner_id: str) -> List[str]:
+    smth = select(AudioFileDbEntity.artist).where(AudioFileDbEntity.owner_id == owner_id)
+    with next(get_db()) as session:
+        return session.scalars(smth).unique()

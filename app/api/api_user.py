@@ -3,6 +3,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from app.db import audio_repository
+
 from ..authorization import auth_repository
 from ..authorization.token_dto import TokenDto
 from ..core.models.user_dto import UserBaseDto, UserCreateDto, UserWithFilesDto
@@ -54,10 +56,11 @@ def delete_user(
 def get_full_user_data(
     current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
 ):
-    user = user_repository.get_user_by_username(username=current_user.username)
-    user = UserBaseDto.model_validate(user)
-    # files = audio_repository.get_files_json(user.id)
-    return UserWithFilesDto(id=user.id, username=user.username, files=[])
+    return UserWithFilesDto(
+        id=current_user.id,
+        username=current_user.username,
+        features=audio_repository.get_feature_awailability(owner_id=current_user.id),
+    )
 
 
 @authRouter.get("/list", response_model=List[UserBaseDto])
