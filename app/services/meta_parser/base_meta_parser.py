@@ -17,7 +17,3 @@ class BaseMetaParser(ABC):
     @abstractmethod
     def get_metadata(self) -> TrackMetaData:
         pass
-
-    @abstractmethod
-    def extract_cover(self) -> Optional[CoverMetaData]:
-        pass

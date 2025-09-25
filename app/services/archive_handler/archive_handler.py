@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Union
-
+from typing import Optional
 from fastapi import UploadFile
 
+from app.services.archive_handler.models import ExtractedData
 
 class ArchiveHandler(ABC):
     """
@@ -10,15 +10,14 @@ class ArchiveHandler(ABC):
     """
 
     @abstractmethod
-    def extract_and_upload(
+    def extract(
         self,
         upload_file: UploadFile,
         current_user,
-        result_list: list,
-        custom_dir: Union[str, None] = None,
-    ):
+        custom_dir: Optional[str] = None,
+    ) -> ExtractedData:
         """
-        Извлечение файлов из архива и последующая загрузка
+        Извлечение файлов из архива
 
         Parameters
         ----------
@@ -26,14 +25,8 @@ class ArchiveHandler(ABC):
             загружаемый арихв
         current_user
             текущий пользователь
-        result_list : list
-            список, куда будут записаны метаданные извлеченных и загруженных файлов
         custom_dir : Union[str, None]
             дополнительная директория.
             Указывается в том случае, если архив загружается не в корень директории пользователя в MinIO
         """
         pass
-
-
-def get_archive_handler() -> ArchiveHandler:
-    pass

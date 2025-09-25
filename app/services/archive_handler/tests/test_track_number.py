@@ -1,6 +1,6 @@
+import re
+from typing import Union
 import unittest
-
-from ..utils import get_track_number
 
 
 class TestReceivingTrackNumber(unittest.TestCase):
@@ -18,7 +18,7 @@ class TestReceivingTrackNumber(unittest.TestCase):
         ]
 
         for i, raw in enumerate(input_str):
-            num = get_track_number(raw)
+            num = __get_track_number(raw)
             self.assertEqual(num, expected_resd[i])
 
     def test_non_digit_string(self):
@@ -43,5 +43,14 @@ class TestReceivingTrackNumber(unittest.TestCase):
         ]
 
         for i, raw in enumerate(input_str):
-            num = get_track_number(raw)
+            num = __get_track_number(raw)
             self.assertEqual(num, expected_res[i], f"{i}: {num}!={expected_res[i]}")
+
+
+def __get_track_number(raw: Union[str, None]) -> int:
+    if not raw:
+        return -1
+
+    segments = re.findall(r"\d+", raw)
+
+    return int(segments[0]) if len(segments) > 0 else -1

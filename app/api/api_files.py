@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 from typing import List, Optional, Union
 
 from fastapi import APIRouter, Depends
@@ -9,20 +10,20 @@ from fastapi.responses import StreamingResponse
 from app.db import audio_repository
 
 from ..authorization import auth_repository
-from ..core.models.file_dto import FileDto
+from ..core.models.file_dto import CoverInDto, FileDto, FileCreateDto
 from ..core.models.user_dto import UserBaseDto
 from ..minio import minio_repository
+from ..minio.minio_file import MinioFile
 from ..services.archive_handler.factory import get_archive_handler
-from ..services.archive_handler.utils import save_file_stream_to_minio_and_db
 
 fileRouter = APIRouter(prefix="/files")
 
 
 @fileRouter.post("/upload", response_model=List[FileDto])
-async def upload_files(
-    files_list: List[UploadFile] = FastAPIFile(...),
-    current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
-    custom_dir: Union[str, None] = None,
+def upload_files(
+        files_list: List[UploadFile] = FastAPIFile(...),
+        current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
+        custom_dir: Union[str, None] = None,
 ):
     """
     Загружает файлы и архивы (zip, tar, tar.gz, tgz, gz) в MinIO
@@ -34,37 +35,103 @@ async def upload_files(
         matched_handler = get_archive_handler(filename)
 
         if matched_handler:
-            matched_handler.extract_and_upload(file, current_user, uploaded_files_metadata, custom_dir)
-        else:
-            save_file_stream_to_minio_and_db(file.file, file.filename, current_user, uploaded_files_metadata)
+            data = matched_handler.extract(upload_file=file, current_user=current_user.id, custom_dir=custom_dir)
+
+            for cover in data.covers:
+                mime_type, _ = mimetypes.guess_type(cover.original_name)
+
+                audio_repository.create_cover_file(
+                    file=CoverInDto(
+                        id=cover.id,
+                        minio_object_name=cover.original_name,
+                    ),
+                )
+
+                minio_repository.put_object(
+                    MinioFile(
+                        object_name=cover.original_name,
+                        data=cover.bytes,
+                        content_type=mime_type,
+                    )
+                )
+
+
+            for audio_file in data.tracks:
+                minio_object_name = f"{current_user.id}/{audio_file.id}.mp3"
+                mime_type, _ = mimetypes.guess_type(minio_object_name)
+
+                audio_repository.create_audio_file(
+                    file = FileCreateDto(
+                        id=audio_file.id,
+                        original_name=audio_file.original_name,
+                        size_bytes=len(audio_file.content_bytes),
+                        minio_object_name=minio_object_name,
+                        track_title=audio_file.metadata.track_title,
+                        track_number=audio_file.metadata.track_number,
+                        artist=audio_file.metadata.artist,
+                        album=audio_file.metadata.album,
+                        mime_type=mime_type,
+                        genre=audio_file.metadata.genre,
+                        cover=audio_file.cover_id,
+                    ),
+                    owner_id=current_user.id,
+                )
+
+                minio_repository.put_object(
+                    MinioFile(
+                        object_name=minio_object_name,
+                        data=audio_file.content_bytes,
+                        content_type= mime_type,
+                    )
+                )
+                
+
+            tracks = list(
+                map(
+                    lambda tr: FileDto(
+                        id=tr.id,
+                        original_name=tr.original_name,
+                        size_bytes=len(tr.content_bytes),
+                        minio_object_name=f"{current_user.id}/{tr.id}.mp3",
+                        track_title=tr.metadata.track_title,
+                        track_number=int(tr.metadata.track_number),
+                        album=tr.metadata.album,
+                        artist=tr.metadata.artist,
+                        genre=None,
+                        cover=tr.cover_id,
+                        mime_type="music/mp3",
+                    ),
+                    data.tracks,
+                ),
+            )
+
+            uploaded_files_metadata=tracks
 
     return uploaded_files_metadata
 
 
 @fileRouter.get("/all", response_model=List[FileDto])
 def get_all_files(
-    skip: int = 0,
-    limit: int = 100,
-    search: str = None,
-    current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
-    get_all_from_db=Depends(audio_repository.get_files_by_owner),
+        skip: int = 0,
+        limit: int = 100,
+        search: str = None,
+        current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
 ):
     """Получает список файлов пользователя с возможностью поиска."""
-    return get_all_from_db(owner_id=current_user.id, skip=skip, limit=limit, search=search)
+    return audio_repository.get_files_by_owner(owner_id=current_user.id, skip=skip, limit=limit, search=search)
 
 
 @fileRouter.get("/get", response_model=FileDto)
 async def get_file(
-    file_id: str,
-    range_header: Optional[str] = Header(None, alias="Range"),
-    current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
-    fetch_file=Depends(audio_repository.get_files_by_owner),
+        file_id: str,
+        range_header: Optional[str] = Header(None, alias="Range"),
+        current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
 ):
     """Скачивает файл, поддерживая частичную загрузку (byte range)."""
 
     from ..minio.minio_file_params import Chunk, Full
 
-    db_file = fetch_file(file_id=file_id)
+    db_file = audio_repository.get_file(file_id=file_id)
     if db_file is None:
         raise HTTPException(status_code=404, detail="File not found")
     if db_file.owner_id != current_user.id:
@@ -112,13 +179,11 @@ async def get_file(
 
 @fileRouter.delete("/remove", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(
-    file_id: str,
-    current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
-    fetch_file=Depends(audio_repository.get_files_by_owner),
-    remove_file=Depends(audio_repository.delete_file),
+        file_id: str,
+        current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
 ):
     """Удаляет файл из MinIO и его метаданные из PostgreSQL."""
-    db_file = fetch_file(file_id=file_id)
+    db_file = audio_repository.get_file(file_id=file_id)
     if db_file is None:
         raise HTTPException(status_code=404, detail="File not found")
     if db_file.owner_id != current_user.id:
@@ -128,11 +193,11 @@ async def delete_file(
     minio_repository.remove_object(object_name=db_file.minio_object_name)
 
     # Удаление из БД
-    remove_file(file_id=file_id)
+    audio_repository.delete_file(file_id=file_id)
 
     return
 
 
 @fileRouter.get("/all_files", response_model=List[FileDto])
-async def files(fetch_all=Depends(audio_repository.get_all_files)):
-    return fetch_all()
+async def files():
+    return audio_repository.get_all_files()

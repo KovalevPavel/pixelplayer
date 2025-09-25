@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +12,7 @@ class UserBaseDto(BaseModel):
 
     id: str
     username: str
+    hashed_password: Optional[str] = None
 
     class Config:
         from_attributes = True  # Позволяет Pydantic работать с объектами SQLAlchemy

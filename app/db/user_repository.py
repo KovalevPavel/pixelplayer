@@ -54,6 +54,7 @@ def get_user_by_username(username: str) -> Optional[UserBaseDto]:
             return UserBaseDto(
                 id=found.id,
                 username=found.username,
+                hashed_password=found.hashed_password,
             )
         return None
 

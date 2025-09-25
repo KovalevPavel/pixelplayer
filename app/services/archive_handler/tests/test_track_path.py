@@ -1,6 +1,5 @@
+from os import path
 import unittest
-
-from ..utils import get_track_title_from_path
 
 
 class TestGetTrackTitleFromPath(unittest.TestCase):
@@ -18,5 +17,9 @@ class TestGetTrackTitleFromPath(unittest.TestCase):
         ]
 
         for i, raw in enumerate(input_str):
-            num = get_track_title_from_path(raw)
+            num = __get_track_title_from_path(raw)
             self.assertEqual(num, expected_resd[i])
+
+
+def __get_track_title_from_path(raw: str) -> str:
+    return path.basename(path.normpath(raw))

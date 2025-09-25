@@ -2,46 +2,58 @@ from typing import List
 
 from sqlalchemy import select
 
-from ..core.models.file_dto import FileCreateDto
+from ..core.models.file_dto import CoverInDto, FileCreateDto
 from ._database import get_db
-from ._entities import FileDbEntity
+from ._entities import AudioFileDbEntity, CoverFileDbEntity
 
 
-def get_all_files() -> List[FileDbEntity]:
+def get_all_files() -> List[AudioFileDbEntity]:
     """
     Получение всех файлов (только для отладки)
     """
-    smth = select(FileDbEntity)
+    smth = select(AudioFileDbEntity)
     with next(get_db()) as session:
         return session.scalars(smth).all()
 
 
-def get_file(file_id: str) -> FileDbEntity | None:
+def get_file(file_id: str) -> AudioFileDbEntity | None:
     """
     Получение метаданных файла из БД
     """
-    smth = select(FileDbEntity).where(FileDbEntity.id == file_id)
+    smth = select(AudioFileDbEntity).where(AudioFileDbEntity.id == file_id)
     with next(get_db()) as session:
         return session.scalar(smth)
 
 
-def get_files_by_owner(owner_id: str, skip: int = 0, limit: int = 100, search: str = None) -> List[FileDbEntity]:
+def get_files_by_owner(owner_id: str, skip: int = 0, limit: int = 100, search: str = None) -> List[AudioFileDbEntity]:
     """
     Получение метаданных всех файлов, принадлежащих пользователю
     """
-    smth = select(FileDbEntity).where(FileDbEntity.owner_id == owner_id)
+    smth = select(AudioFileDbEntity).where(AudioFileDbEntity.owner_id == owner_id)
     if search:
-        smth = smth.where(FileDbEntity.original_name.ilike(f"%{search}%"))
+        smth = smth.where(AudioFileDbEntity.original_name.ilike(f"%{search}%"))
     with next(get_db()) as session:
         return session.scalars(smth.offset(skip).limit(limit)).all()
 
 
-def create_file(file: FileCreateDto, owner_id: str):
+def create_audio_file(file: FileCreateDto, owner_id: str):
     """
-    Создание метаданных нового файла в БД
+    Создание метаданных нового аудио файла в БД
     """
 
-    db_file = FileDbEntity(**file.model_dump(), owner_id=owner_id)
+    db_file = AudioFileDbEntity(**file.model_dump(), owner_id=owner_id)
+    with next(get_db()) as session:
+        session.add(db_file)
+        session.commit()
+        session.refresh(db_file)
+    return db_file
+
+def create_cover_file(file: CoverInDto):
+    """
+    Создание метаданных нового файла обложки в БД
+    """
+    
+    db_file = CoverFileDbEntity(**file.model_dump())
     with next(get_db()) as session:
         session.add(db_file)
         session.commit()

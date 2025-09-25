@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import List
 
@@ -5,8 +6,7 @@ from sqlalchemy import BigInteger, DateTime, ForeignKey, SmallInteger, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from ._utils import Base, random_uuid
-
+from ._utils import Base
 
 class UserDbEntity(Base):
     """
@@ -30,23 +30,23 @@ class UserDbEntity(Base):
 
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(primary_key=True, default=random_uuid)
+    id: Mapped[str] = mapped_column(primary_key=True, default=str(uuid.uuid4()))
     username: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Каскадное удаление файлов при удалении пользователя
-    files: Mapped[List["FileDbEntity"]] = relationship(
-        "FileDbEntity",
+    files: Mapped[List["AudioFileDbEntity"]] = relationship(
+        "AudioFileDbEntity",
         back_populates="owner",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
 
 
-class FileDbEntity(Base):
+class AudioFileDbEntity(Base):
     """
-    Таблица с файлами пользователей
+    Сущность аудиофайла пользователя
 
     Attributes
     ----------
@@ -88,7 +88,17 @@ class FileDbEntity(Base):
     album: Mapped[str] = mapped_column(String, nullable=True)
     artist: Mapped[str] = mapped_column(String, nullable=True)
     genre: Mapped[str] = mapped_column(String, nullable=True)
-    cover: Mapped[str] = mapped_column(String, nullable=True)
+    cover = mapped_column(ForeignKey("covers.id"), index=True, nullable=True)
 
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     owner: Mapped["UserDbEntity"] = relationship(back_populates="files")
+
+
+class CoverFileDbEntity(Base):
+    """
+    Сущность файла обложки конкретного трека
+    """
+    __tablename__ = "covers"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    minio_object_name = mapped_column(String, nullable=False, unique=True)

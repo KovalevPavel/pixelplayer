@@ -1,5 +1,3 @@
-import uuid
-
 from passlib.context import CryptContext
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -20,7 +18,3 @@ _engine = create_engine(DATABASE_URL)
 
 # Базовый класс для всех наших моделей SQLAlchemy
 Base = declarative_base()
-
-
-def random_uuid():
-    return str(uuid.uuid4())

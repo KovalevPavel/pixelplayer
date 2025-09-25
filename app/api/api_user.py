@@ -61,5 +61,5 @@ def get_full_user_data(
 
 
 @authRouter.get("/list", response_model=List[UserBaseDto])
-def list_users(fetch_all_users=Depends(user_repository.get_all_users)):
-    return fetch_all_users()
+def list_users():
+    return user_repository.get_all_users()

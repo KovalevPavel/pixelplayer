@@ -48,6 +48,14 @@ class FileCreateDto(BaseModel):
     genre: Optional[str]
     cover: Optional[str]
 
+class CoverInDto(BaseModel):
+    """Dto для загрузки обложки в БД"""
+    id: str
+    minio_object_name: str
+
+    class Config:
+        from_attributes = True
+
 
 class FileDto(BaseModel):
     """

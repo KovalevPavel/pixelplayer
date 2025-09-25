@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 
 
@@ -6,22 +6,6 @@ class BaseMinObj(ABC):
     """
     Объект, который может быть сохранен в MinIO
     """
-
-    @property
-    @abstractmethod
-    def object_name(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
-    def data(self) -> bytes:
-        pass
-
-    @property
-    @abstractmethod
-    def content_type(self) -> str:
-        pass
-
 
 @dataclass(frozen=True)
 class MinioFile(BaseMinObj):
