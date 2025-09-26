@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timedelta
 import logging
 import os
 from pathlib import Path
@@ -229,7 +229,7 @@ async def files():
 
 @fileRouter.get("/play/{track_id}")
 async def get_playlist_url(track_id: str):
-    expire = datetime.now(timezone.utc) + datetime.timedelta(minutes=HLS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=HLS_TOKEN_EXPIRE_MINUTES)
     to_encode = {
         "exp": expire,
         "subject": track_id  # В "subject" токена кладем ID трека
