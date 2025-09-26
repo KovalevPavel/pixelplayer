@@ -257,7 +257,11 @@ async def verify_hls_token(request: Request, x_original_uri: str | None = Header
     try:
         # Nginx передает нам оригинальный URI, например /hls/track123/playlist.m3u8?token=...
         # 1. Извлекаем токен из query-параметров
-        token = request.query_params.get("token")
+        token = None
+        if x_original_uri and "token=" in x_original_uri:
+            from urllib.parse import parse_qs, urlparse
+            query = urlparse(x_original_uri).query
+            token = parse_qs(query).get("token", [None])[0]
         if not token:
             raise HTTPException(status_code=401, detail="Token not found")
 
