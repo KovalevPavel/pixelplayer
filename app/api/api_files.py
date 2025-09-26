@@ -1,10 +1,9 @@
-from datetime import datetime, timedelta
 import logging
 import os
 from pathlib import Path
 import tempfile
 import shutil
-from time import timezone
+import time
 from typing import List, Optional, Union
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -229,7 +228,7 @@ async def files():
 
 @fileRouter.get("/play/{track_id}")
 async def get_playlist_url(track_id: str):
-    expire = datetime.now(timezone.utc) + timedelta(minutes=HLS_TOKEN_EXPIRE_MINUTES)
+    expire = time.time()*1000 + int(HLS_TOKEN_EXPIRE_MINUTES)*60*1000
     to_encode = {
         "exp": expire,
         "subject": track_id  # В "subject" токена кладем ID трека
