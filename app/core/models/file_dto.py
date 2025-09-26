@@ -64,7 +64,6 @@ class FileDto(BaseModel):
 
     id: str
     original_name: str
-    size_bytes: int
     mime_type: str
     minio_object_name: str
 

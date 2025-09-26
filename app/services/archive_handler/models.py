@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -9,7 +9,7 @@ from app.services.meta_parser.metadata import TrackMetaData, CoverMetaData
 class ArchivedFile(ABC):
     id: str
     original_name: str
-    content_bytes: bytes
+    content_bytes: Optional[bytes]
     metadata: BaseModel
 
 
@@ -30,10 +30,10 @@ class AudioFileArchivedFile(ArchivedFile):
     metadata: TrackMetaData
         метаданные аудиофайла
     """
-    def __init__(self, track_id, original_name, track_bytes, cover_id, metadata: TrackMetaData):
+    def __init__(self, track_id, original_name, cover_id, metadata: TrackMetaData):
         self.id = track_id
         self.original_name = original_name
-        self.content_bytes = track_bytes
+        self.content_bytes = None
         self.cover_id = cover_id
         self.metadata = metadata
 

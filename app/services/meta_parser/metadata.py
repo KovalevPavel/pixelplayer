@@ -13,6 +13,7 @@ class TrackMetaData(BaseModel):
     album: Optional[str]
     artist: Optional[str]
     genre: Optional[str]
+    mime: Optional[str]
 
 
 class CoverMetaData(BaseModel):

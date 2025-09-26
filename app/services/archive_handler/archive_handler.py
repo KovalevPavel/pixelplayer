@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Optional
-from fastapi import UploadFile
 
 from app.services.archive_handler.models import ExtractedData
 
@@ -12,7 +11,8 @@ class ArchiveHandler(ABC):
     @abstractmethod
     def extract(
         self,
-        upload_file: UploadFile,
+        zip_path,
+        tmp_dir,
         current_user,
         custom_dir: Optional[str] = None,
     ) -> ExtractedData:

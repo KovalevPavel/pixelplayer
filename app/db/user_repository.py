@@ -2,17 +2,18 @@ from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from passlib.hash import argon2
 
 from app.core.models.user_dto import UserBaseDto, UserCreateDto
 from app.db._database import get_db
 from app.db._entities import UserDbEntity
 
-from ._utils import __pwd_context, get_string_hash
+from ._utils import get_string_hash
 
 
 def verify_password(plain_password, hashed_password):
     """Верификация пароля"""
-    return __pwd_context.verify(plain_password, hashed_password)
+    return argon2.verify(plain_password, hashed_password)
 
 
 def get_user(user_id: str) -> UserDbEntity:

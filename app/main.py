@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from starlette.templating import Jinja2Templates
 
-from .api.api_files import fileRouter
+from .api.api_files import fileRouter, internalRouter
 from .api.api_user import authRouter
 from .db.factory import init_database
 
@@ -19,3 +19,4 @@ app = FastAPI(
 # Подключаем роутеры с нашими эндпоинтами
 app.include_router(authRouter, prefix="/v1", tags=["api_auth"])
 app.include_router(fileRouter, prefix="/v1", tags=["api_files"])
+app.include_router(internalRouter, prefix="/v1", tags=["api_internal"])

@@ -91,14 +91,16 @@ def remove_files_by_user(username: str) -> Optional[int]:
         return None
 
     try:
+        errors_count = 0
         # Формируем генератор для удаления пачкой
         delete_objects = (DeleteObject(obj.object_name) for obj in objects_to_delete)
         errors = remove_objects(delete_objects)
         # Логируем ошибки
         for err in errors:
+            errors_count += 1
             logging.error(f"Ошибка удаления файла {err.object_name}: {err}")
 
-        return len(errors)
+        return errors_count
 
     except S3Error as err:
         raise HTTPException(status_code=500, detail=f"Ошибка при удалении из MinIO: {err.message}")

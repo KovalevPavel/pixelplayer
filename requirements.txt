@@ -4,7 +4,7 @@ sqlalchemy~=2.0.42
 psycopg2-binary
 minio~=7.2.16
 python-jose[cryptography]~=3.5.0
-passlib[bcrypt]~=1.7.4
+passlib[argon2]~=1.7.4
 python-multipart
 python-dotenv~=1.1.1
 jinja2

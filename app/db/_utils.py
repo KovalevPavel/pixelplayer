@@ -1,16 +1,13 @@
-from passlib.context import CryptContext
+from passlib.hash import argon2
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 
 from ..core.config import DATABASE_URL
 
-# Контекст для хеширования паролей, используем bcrypt
-__pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def get_string_hash(string):
     """Хэширование пароля"""
-    return __pwd_context.hash(string)
+    return argon2.hash(string)
 
 
 # Создаем "движок" для подключения к БД

@@ -48,8 +48,8 @@ def create_user(user: UserCreateDto):
 def delete_user(
     current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
 ):
-    deleted_user = user_repository.delete_user(user_id=current_user.id)
-    minio_repository.remove_files_by_user(username=deleted_user.username)
+    user_repository.delete_user(user_id=current_user.id)
+    minio_repository.remove_files_by_user(username=current_user.id)
 
 
 @authRouter.get("/me", response_model=UserWithFilesDto)

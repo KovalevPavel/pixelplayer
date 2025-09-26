@@ -1,10 +1,12 @@
 import logging
+import mimetypes
+import os
+from pathlib import Path
 import uuid
 import zipfile
 from typing import List
 from typing import Optional
 
-from fastapi import UploadFile
 
 from app.services.archive_handler.archive_handler import ArchiveHandler
 from ..models import AudioFileArchivedFile, CoverArchivedFile, ExtractedData
@@ -18,25 +20,26 @@ class ZipArchiveHandler(ArchiveHandler):
     """
 
     def __init__(self):
-        self.__zip_file = None
         self.__audiofiles: List[AudioFileArchivedFile] = list()
         self.__covers: List[CoverArchivedFile] = list()
         self.__current_user: Optional[str] = None
 
     def extract(
             self,
-            upload_file: UploadFile,
+            zip_path,
+            tmp_dir,
             current_user,
             custom_dir: Optional[str] = None,
     ):
         self.__audiofiles = list()
         self.__covers = list()
         self.__current_user = current_user
-        with zipfile.ZipFile(upload_file.file, "r") as archive:
-            self.__zip_file = archive
-            self.__process_directory("", None)
 
-            self.__current_user = None
+        with zipfile.ZipFile(zip_path, "r") as archive:
+            archive.extractall(tmp_dir)
+            self.__process_directory(tmp_dir, None)
+
+            # self.__current_user = None
 
             return ExtractedData(
                 tracks=self.__audiofiles,
@@ -59,21 +62,19 @@ class ZipArchiveHandler(ArchiveHandler):
         
         # Обрабатываем все аудиофайлы в папке
         for file in files:
-            # logging.warning(f"handling file: {file}")
-            content = self.__zip_file.read(file)
-            handler = get_parser(content_bytes=content)
+            filepath = f"{path}/{file}"
+            handler = get_parser(file=filepath)
             if not handler:
-                logging.warning(f"not found handler for file: {file}")
+                logging.warning(f"Could not find handler for file: {file}")
                 continue
 
             track_id = str(uuid.uuid4())
 
             result = AudioFileArchivedFile(
                 track_id=track_id,
-                original_name=path,
-                track_bytes=content,
+                original_name=filepath,
                 cover_id=current_cover.id if current_cover else None,
-                metadata=handler.get_metadata(),
+                metadata=handler.get_metadata(name=filepath),
             )
 
             self.__audiofiles.append(result)
@@ -86,26 +87,27 @@ class ZipArchiveHandler(ArchiveHandler):
         """
         Если в папке есть cover.jpg -> сохраняем его и возвращаем ссылку
         """
-        p = path.lstrip("/")
-        cover_name = f"{p}/cover.jpg"
-        if cover_name in self.__zip_file.namelist():
-            content: bytes = self.__zip_file.read(cover_name)
+        cover_name = f"{path}/cover.jpg"
+        if os.path.exists(cover_name):
+            content: bytes = Path(cover_name).read_bytes()
             cover_id = str(uuid.uuid4())
 
             # путь до обложки в MinIO
             object_name = f"{self.__current_user}/covers/{cover_id}.jpg"
+
+            mimetype, _ = mimetypes.guess_type(cover_name)
 
             obj = CoverArchivedFile(
                 cover_id=cover_id,
                 original_name=object_name,
                 cover_bytes=content,
                 metadata=CoverMetaData(
-                    mime="image/jpg",
+                    mime=mimetype,
                     width=None,
                     heigth=None,
                     bytes=content,
-                    format="jpg"
-                )
+                    format="jpg",
+                ),
             )
 
             self.__covers.append(obj)
@@ -114,21 +116,13 @@ class ZipArchiveHandler(ArchiveHandler):
 
     def __list_files(self, path: str) -> list[str]:
         """Вернет список файлов (без директорий) внутри указанного path."""
-        p = path.lstrip("/")
-        return [
-            name for name in self.__zip_file.namelist()
-            if name.startswith(p)
-               and "/" not in name[len(p) + 1:]
-               and not name.endswith("/")
-        ]
-
+        return [name for name in os.listdir(path) if name.endswith(".mp3")]
 
     def __list_subdirs(self, path: str) -> list[str]:
         """Вернет список поддиректорий внутри указанного path."""
         subdirs = set()
-        for name in self.__zip_file.namelist():
-            if name.startswith(path) and name != path:
-                parts = name[len(path):].strip("/").split("/", 1)
-                if len(parts) > 1:
-                    subdirs.add(f"{path}/{parts[0]}")
+        for name in os.listdir(path):
+            raw_path = f"{path}/{name}"
+            if os.path.isdir(raw_path):
+                subdirs.add(raw_path)
         return list(subdirs)

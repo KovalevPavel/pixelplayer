@@ -1,26 +1,36 @@
+import datetime
 import logging
-import mimetypes
+import os
+from pathlib import Path
+import tempfile
+import shutil
+from time import timezone
 from typing import List, Optional, Union
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi import File as FastAPIFile
 from fastapi import Header, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
+from jose import jwt
+from jose.exceptions import JWTError
 
 from app.db import audio_repository
+from app.services.decoding.decoding import convert_audio
 
 from ..authorization import auth_repository
 from ..core.models.file_dto import CoverInDto, FileDto, FileCreateDto
+from ..core.config import ALGORITHM, FAST_API_DOMAIN, HLS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
 from ..core.models.user_dto import UserBaseDto
 from ..minio import minio_repository
 from ..minio.minio_file import MinioFile
 from ..services.archive_handler.factory import get_archive_handler
 
 fileRouter = APIRouter(prefix="/files")
+internalRouter = APIRouter(prefix="/internal")
 
 
 @fileRouter.post("/upload", response_model=List[FileDto])
-def upload_files(
+async def upload_files(
         files_list: List[UploadFile] = FastAPIFile(...),
         current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
         custom_dir: Union[str, None] = None,
@@ -35,77 +45,92 @@ def upload_files(
         matched_handler = get_archive_handler(filename)
 
         if matched_handler:
-            data = matched_handler.extract(upload_file=file, current_user=current_user.id, custom_dir=custom_dir)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                # Сохраняем zip во временный файл
+                zip_path = os.path.join(tmpdir, file.filename)
+                with open(zip_path, "wb") as f:
+                    shutil.copyfileobj(file.file, f)
 
-            for cover in data.covers:
-                mime_type, _ = mimetypes.guess_type(cover.original_name)
-
-                audio_repository.create_cover_file(
-                    file=CoverInDto(
-                        id=cover.id,
-                        minio_object_name=cover.original_name,
-                    ),
+                data = matched_handler.extract(
+                    zip_path=zip_path,
+                    tmp_dir=tmpdir,
+                    current_user=current_user.id,
+                    custom_dir=custom_dir,
                 )
 
-                minio_repository.put_object(
-                    MinioFile(
-                        object_name=cover.original_name,
-                        data=cover.bytes,
-                        content_type=mime_type,
+                for cover in data.covers:
+                    audio_repository.create_cover_file(
+                        file=CoverInDto(
+                            id=cover.id,
+                            minio_object_name=cover.original_name,
+                        ),
                     )
-                )
 
-
-            for audio_file in data.tracks:
-                minio_object_name = f"{current_user.id}/{audio_file.id}.mp3"
-                mime_type, _ = mimetypes.guess_type(minio_object_name)
-
-                audio_repository.create_audio_file(
-                    file = FileCreateDto(
-                        id=audio_file.id,
-                        original_name=audio_file.original_name,
-                        size_bytes=len(audio_file.content_bytes),
-                        minio_object_name=minio_object_name,
-                        track_title=audio_file.metadata.track_title,
-                        track_number=audio_file.metadata.track_number,
-                        artist=audio_file.metadata.artist,
-                        album=audio_file.metadata.album,
-                        mime_type=mime_type,
-                        genre=audio_file.metadata.genre,
-                        cover=audio_file.cover_id,
-                    ),
-                    owner_id=current_user.id,
-                )
-
-                minio_repository.put_object(
-                    MinioFile(
-                        object_name=minio_object_name,
-                        data=audio_file.content_bytes,
-                        content_type= mime_type,
+                    minio_repository.put_object(
+                        MinioFile(
+                            object_name=cover.original_name,
+                            data=cover.bytes,
+                            content_type=cover.metadata.mime,
+                        )
                     )
-                )
+                
+                minio_dir = f"{tmpdir}/minio"
+
+
+                for audio_file in data.tracks:
+
+                    convert_audio(
+                        file_id=audio_file.id,
+                        file_path=audio_file.original_name,
+                        output_path=minio_dir,
+                    )
+
+                    audio_repository.create_audio_file(
+                        file = FileCreateDto(
+                            id=audio_file.id,
+                            original_name=audio_file.original_name,
+                            size_bytes=5,
+                            minio_object_name=audio_file.id,
+                            track_title=audio_file.metadata.track_title,
+                            track_number=audio_file.metadata.track_number,
+                            artist=audio_file.metadata.artist,
+                            album=audio_file.metadata.album,
+                            mime_type=audio_file.metadata.mime,
+                            genre=audio_file.metadata.genre,
+                            cover=audio_file.cover_id,
+                        ),
+                        owner_id=current_user.id,
+                    )
+
+                    for ff in os.listdir(f"{minio_dir}/{audio_file.id}"):
+                        minio_repository.put_object(
+                            MinioFile(
+                                object_name=f"{current_user.id}/{audio_file.id}/{ff}",
+                                data=Path(f"{minio_dir}/{audio_file.id}/{ff}").read_bytes(),
+                                content_type= audio_file.metadata.mime,
+                            )
+                        )
                 
 
-            tracks = list(
-                map(
-                    lambda tr: FileDto(
-                        id=tr.id,
-                        original_name=tr.original_name,
-                        size_bytes=len(tr.content_bytes),
-                        minio_object_name=f"{current_user.id}/{tr.id}.mp3",
-                        track_title=tr.metadata.track_title,
-                        track_number=int(tr.metadata.track_number),
-                        album=tr.metadata.album,
-                        artist=tr.metadata.artist,
-                        genre=None,
-                        cover=tr.cover_id,
-                        mime_type="music/mp3",
+                tracks = list(
+                    map(
+                        lambda tr: FileDto(
+                            id=tr.id,
+                            original_name=tr.original_name,
+                            minio_object_name=f"{current_user.id}/{tr.id}.mp3",
+                            track_title=tr.metadata.track_title,
+                            track_number=int(tr.metadata.track_number),
+                            album=tr.metadata.album,
+                            artist=tr.metadata.artist,
+                            genre=tr.metadata.genre,
+                            cover=tr.cover_id,
+                            mime_type=tr.metadata.mime,
+                        ),
+                        data.tracks,
                     ),
-                    data.tracks,
-                ),
-            )
+                )
 
-            uploaded_files_metadata=tracks
+                uploaded_files_metadata=tracks
 
     return uploaded_files_metadata
 
@@ -201,3 +226,61 @@ async def delete_file(
 @fileRouter.get("/all_files", response_model=List[FileDto])
 async def files():
     return audio_repository.get_all_files()
+
+@fileRouter.get("/play/{track_id}")
+async def get_playlist_url(track_id: str):
+    expire = datetime.now(timezone.utc) + datetime.timedelta(minutes=HLS_TOKEN_EXPIRE_MINUTES)
+    to_encode = {
+        "exp": expire,
+        "subject": track_id  # В "subject" токена кладем ID трека
+    }
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    playlist_url = f"{FAST_API_DOMAIN}/hls/{track_id}/playlist.m3u8?token={encoded_jwt}"
+    
+    return {"playlist_url": playlist_url}
+
+@internalRouter.get("/verify-hls")
+async def verify_hls_token(request: Request, x_original_uri: str | None = Header(None)):
+    """
+    Внутренний эндпоинт для проверки токена доступа к HLS.
+    Вызывается Nginx через auth_request.
+    """
+    if not x_original_uri:
+        raise HTTPException(status_code=400, detail="Missing X-Original-URI header")
+
+    try:
+        # Nginx передает нам оригинальный URI, например /hls/track123/playlist.m3u8?token=...
+        # 1. Извлекаем токен из query-параметров
+        token = request.query_params.get("token")
+        if not token:
+            raise HTTPException(status_code=401, detail="Token not found")
+
+        # 2. Извлекаем ID трека из пути URI
+        # /hls/track123/playlist.m3u8 -> track123
+        path_parts = x_original_uri.split("?")[0].split("/")
+        # path_parts будет ['','hls','track123', 'playlist.m3u8']
+        if len(path_parts) < 3 or path_parts[1] != 'hls':
+            raise HTTPException(status_code=400, detail="Invalid URI format")
+        track_id_from_url = path_parts[2]
+
+        # 3. Декодируем и валидируем токен
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        track_id_from_token: str = payload.get("subject")
+
+        # 4. Главная проверка: ID трека в токене должен совпадать с ID трека в URL
+        if track_id_from_token != track_id_from_url:
+            raise HTTPException(status_code=403, detail="Token-URL mismatch")
+
+    except JWTError:
+        raise HTTPException(status_code=403, detail="Invalid or expired token")
+    except HTTPException as e:
+        # Перехватываем свои же ошибки, чтобы Nginx получил правильный код
+        raise e
+    except Exception:
+        # На случай непредвиденных ошибок парсинга
+        raise HTTPException(status_code=400, detail="Bad request")
+
+    # Если все проверки пройдены, возвращаем 200 OK. Nginx получит этот ответ
+    # и продолжит выполнение запроса (отдаст файл из MinIO).
+    return Response(status_code=200)
+    
