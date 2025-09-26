@@ -246,8 +246,7 @@ async def verify_hls_token(request: Request, x_original_uri: str | None = Header
     Вызывается Nginx через auth_request.
     """
     try:
-        # user_id = get_user_id(request)
-        user_id = "db7267a8-377b-49cb-a92c-29106b0ff882"
+        user_id = get_user_id(request)
     except JWTError:
         raise
 
