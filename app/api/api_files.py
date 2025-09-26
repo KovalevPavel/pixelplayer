@@ -13,6 +13,7 @@ from fastapi.responses import StreamingResponse
 from jose import jwt
 from jose.exceptions import JWTError
 
+from app.api.utils import get_user_id
 from app.db import audio_repository
 from app.services.decoding.decoding import convert_audio
 
@@ -244,6 +245,12 @@ async def verify_hls_token(request: Request, x_original_uri: str | None = Header
     Внутренний эндпоинт для проверки токена доступа к HLS.
     Вызывается Nginx через auth_request.
     """
+    try:
+        # user_id = get_user_id(request)
+        user_id = "db7267a8-377b-49cb-a92c-29106b0ff882"
+    except JWTError:
+        raise
+
     if not x_original_uri:
         raise HTTPException(status_code=400, detail="Missing X-Original-URI header")
 
@@ -281,5 +288,7 @@ async def verify_hls_token(request: Request, x_original_uri: str | None = Header
 
     # Если все проверки пройдены, возвращаем 200 OK. Nginx получит этот ответ
     # и продолжит выполнение запроса (отдаст файл из MinIO).
-    return Response(status_code=200)
+    response = Response(status_code=200)
+    response.headers["X-User-ID"] = user_id
+    return response
     

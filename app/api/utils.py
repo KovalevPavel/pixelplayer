@@ -1,6 +1,11 @@
 import logging
 import unicodedata
 
+from fastapi import HTTPException, Request
+from jose import JWTError, jwt
+
+from ..core.config import ALGORITHM, SECRET_KEY
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,3 +33,22 @@ def normalize_filename(raw_filename: str) -> str:
 
     # Финальная нормализация в NFC (рекомендуемый формат для хранения в БД)
     return unicodedata.normalize("NFC", result)
+
+def __get_token(request: Request) -> str:
+    auth_header = request.headers["Authorization"]
+    if not auth_header or not auth_header.startswith("Bearer"):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    user_token = auth_header.split(' ')[1]
+
+    try:
+        payload = jwt.decode(user_token, SECRET_KEY, algorithms=ALGORITHM)
+    except JWTError:
+        raise HTTPException(status_code=403, detail="Invalid or expired token")
+
+    return payload
+
+
+def get_user_id(request: Request) -> str:
+    user_token = __get_token(request)
+    return user_token["user_id"]
