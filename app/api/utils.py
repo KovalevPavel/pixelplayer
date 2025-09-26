@@ -35,7 +35,11 @@ def normalize_filename(raw_filename: str) -> str:
     return unicodedata.normalize("NFC", result)
 
 def __get_token(request: Request) -> str:
-    auth_header = request.headers["Authorization"]
+    try:
+        auth_header = request.headers["Authorization"]
+    except KeyError:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    
     if not auth_header or not auth_header.startswith("Bearer"):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
