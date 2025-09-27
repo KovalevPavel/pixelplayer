@@ -1,9 +1,9 @@
+from datetime import UTC, datetime, timedelta
 import logging
 import os
 from pathlib import Path
 import tempfile
 import shutil
-import time
 from typing import List, Optional, Union
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -13,7 +13,6 @@ from fastapi.responses import StreamingResponse
 from jose import jwt
 from jose.exceptions import JWTError
 
-from app.api.utils import get_user_id
 from app.db import audio_repository
 from app.services.decoding.decoding import convert_audio
 
@@ -228,8 +227,14 @@ async def files():
     return audio_repository.get_all_files()
 
 @fileRouter.get("/play/{track_id}")
-async def get_playlist_url(track_id: str):
-    expire = time.time()*1000 + int(HLS_TOKEN_EXPIRE_MINUTES)*60*1000
+async def get_playlist_url(
+    track_id: str,
+    current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
+):
+    if not current_user.id:
+        raise HTTPException(status_code=403)
+
+    expire = datetime.now(UTC) + timedelta(minutes=HLS_TOKEN_EXPIRE_MINUTES)
     to_encode = {
         "exp": expire,
         "subject": track_id  # В "subject" токена кладем ID трека
@@ -240,15 +245,16 @@ async def get_playlist_url(track_id: str):
     return {"playlist_url": playlist_url}
 
 @internalRouter.get("/verify-hls")
-async def verify_hls_token(request: Request, x_original_uri: str | None = Header(None)):
+async def verify_hls_token(
+    request: Request,
+    x_original_uri: str | None = Header(None),
+    current_user: UserBaseDto = Depends(auth_repository.get_current_active_user),
+):
     """
     Внутренний эндпоинт для проверки токена доступа к HLS.
     Вызывается Nginx через auth_request.
     """
-    try:
-        user_id = get_user_id(request)
-    except JWTError:
-        raise
+    user_id = current_user.id
 
     if not x_original_uri:
         raise HTTPException(status_code=400, detail="Missing X-Original-URI header")
@@ -256,12 +262,12 @@ async def verify_hls_token(request: Request, x_original_uri: str | None = Header
     try:
         # Nginx передает нам оригинальный URI, например /hls/track123/playlist.m3u8?token=...
         # 1. Извлекаем токен из query-параметров
-        token = None
+        backend_token = None
         if x_original_uri and "token=" in x_original_uri:
             from urllib.parse import parse_qs, urlparse
             query = urlparse(x_original_uri).query
-            token = parse_qs(query).get("token", [None])[0]
-        if not token:
+            backend_token = parse_qs(query).get("token", [None])[0]
+        if not backend_token:
             raise HTTPException(status_code=401, detail="Token not found")
 
         # 2. Извлекаем ID трека из пути URI
@@ -273,7 +279,7 @@ async def verify_hls_token(request: Request, x_original_uri: str | None = Header
         track_id_from_url = path_parts[2]
 
         # 3. Декодируем и валидируем токен
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(backend_token, SECRET_KEY, algorithms=[ALGORITHM])
         track_id_from_token: str = payload.get("subject")
 
         # 4. Главная проверка: ID трека в токене должен совпадать с ID трека в URL

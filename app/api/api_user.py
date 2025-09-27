@@ -33,7 +33,7 @@ def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@authRouter.post("/register", response_model=UserBaseDto)
+@authRouter.post("/register", response_model=TokenDto)
 def create_user(user: UserCreateDto):
     """
     Создает пользователя
@@ -41,7 +41,8 @@ def create_user(user: UserCreateDto):
     db_user = user_repository.get_user_by_username(username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
-    return user_repository.create_user(user=user)
+    access_token = auth_repository.create_access_token(data={"user_id": user.id})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @authRouter.delete("/delete", status_code=status.HTTP_204_NO_CONTENT)
