@@ -8,7 +8,7 @@ from jose import JWTError, jwt
 from app.core import config
 
 from ..core.models.user_dto import UserBaseDto
-from ..db.user_repository import get_user_by_username, verify_password
+from ..db import user_repository
 
 # Схема аутентификации OAuth2. 'tokenUrl' указывает на наш эндпоинт получения токена.
 __oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/user/auth")
@@ -21,17 +21,16 @@ def get_current_active_user(token: str = Depends(__oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
     )
     try:
         payload = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        user_id: str = payload.get("user_id")
+        if not user_id:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
-    user = get_user_by_username(username=username)
+    user = user_repository.get_user_by_id(user_id=user_id)
     if user is None:
         raise credentials_exception
     return user
@@ -54,9 +53,9 @@ def try_authenticate_user(username: str, password: str) -> UserBaseDto | None:
     """
     Авторизация пользователя
     """
-    user = get_user_by_username(username)
+    user = user_repository.get_user_by_username(username)
     if not user:
         return None
-    if not verify_password(password, user.hashed_password):
+    if not user_repository.verify_password(password, user.hashed_password):
         return None
     return user

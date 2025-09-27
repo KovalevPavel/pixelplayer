@@ -59,6 +59,21 @@ def get_user_by_username(username: str) -> Optional[UserBaseDto]:
             )
         return None
 
+def get_user_by_id(user_id: str) -> Optional[UserBaseDto]:
+    """
+    Получение информации о пользователе по его id
+    """
+    smth = select(UserDbEntity).where(UserDbEntity.id == user_id)
+    with next(get_db()) as session:
+        found = session.scalar(smth)
+        if found:
+            return UserBaseDto(
+                id=found.id,
+                username=found.username,
+                hashed_password=None,
+            )
+        return None
+
 
 def create_user(user: UserCreateDto) -> UserBaseDto:
     """
